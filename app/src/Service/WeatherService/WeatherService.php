@@ -31,18 +31,6 @@ class WeatherService
         $this->saveWeatherHistory($city, $currentAverageTemperature);
 
         return $currentAverageTemperature;
-
-//        $cacheKey = $this->getCacheKey($city, $country);
-//
-//        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($city) {
-//            $item->expiresAfter(3600);
-//            $ambeeClientData = $this->ambeeClient->getWeather($city->getLatitude(), $city->getLongitude());
-//            $openWeatherClientData = $this->openWeatherMapClient->getWeather($city->getLatitude(), $city->getLongitude());
-//            $currentAverageTemperature = ($ambeeClientData + $openWeatherClientData) / 2;
-//            $this->saveWeatherHistory($city, $currentAverageTemperature);
-//
-//            return $currentAverageTemperature;
-//        });
     }
 
     private function saveWeatherHistory(City $city, float $temperature)
