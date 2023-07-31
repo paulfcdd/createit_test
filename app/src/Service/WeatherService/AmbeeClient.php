@@ -27,9 +27,6 @@ class AmbeeClient extends AbstractWeatherClient
 
             return $this->convertFahrenheitToCelsius($result->data->temperature);
         } catch (\Throwable $e) {
-            // Handle the exception here or rethrow it if needed
-            // For example, log the error, return a default value, etc.
-            // If you don't want to handle it here, you can rethrow it to let the caller handle it.
             throw $e;
         }
     }

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace App\Service\WeatherService;
 
+use App\Service\WeatherService\Exception\WeatherServiceApiRequestException;
+use App\Service\WeatherService\Exception\WeatherServiceException;
+use App\Service\WeatherService\Exception\WeatherServiceTransportException;
 use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
@@ -23,24 +26,17 @@ abstract class AbstractWeatherClient
     public function makeRequest(string $apiUrl, string $method = 'GET', array $options = []): string
     {
         try {
-            $response = $this->client->request(
-                $method,
-                $apiUrl,
-                $options
+            $response = $this->client->request($method, $apiUrl, $options
             );
-
-            // Check if the response is successful (HTTP status code 2xx)
             if (!$this->isSuccessful($response)) {
-                throw new \RuntimeException('API request failed: ' . $response->getStatusCode());
+                throw new WeatherServiceApiRequestException($response->getStatusCode());
             }
 
             return $response->getContent();
         } catch (TransportExceptionInterface $e) {
-            // Handle any transport-related exceptions, like network errors
-            throw new \RuntimeException('Transport error occurred: ' . $e->getMessage(), $e->getCode(), $e);
+            throw new WeatherServiceTransportException($e->getMessage(), $e->getCode(), $e);
         } catch (\Throwable $e) {
-            // Handle any other unexpected exceptions
-            throw new \RuntimeException('An unexpected error occurred: ' . $e->getMessage(), $e->getCode(), $e);
+            throw new WeatherServiceException($e->getMessage(), $e->getCode(), $e);
         }
     }
 

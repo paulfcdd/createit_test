@@ -7,45 +7,55 @@ namespace App\Service\WeatherService;
 use App\Entity\City;
 use App\Entity\Country;
 use App\Entity\WeatherSearchHistory;
-use App\Repository\WeatherSearchHistoryRepository;
+use App\Service\WeatherService\Exception\AbstractWeatherException;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Cache\InvalidArgumentException;
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use Symfony\Contracts\Cache\CacheInterface;
 use Symfony\Contracts\Cache\ItemInterface;
 
-class WeatherService
+readonly class WeatherService
 {
     public function __construct(
-        private readonly OpenWeatherMapClient $openWeatherMapClient,
-        private readonly AmbeeClient $ambeeClient,
-        private readonly CacheInterface $cache,
-        private readonly EntityManagerInterface $entityManager,
+        private OpenWeatherMapClient   $openWeatherMapClient,
+        private AmbeeClient            $ambeeClient,
+        private CacheInterface         $cache,
+        private EntityManagerInterface $entityManager,
+        private ParameterBagInterface  $parameterBag,
     )
     {
     }
 
-    public function getWeather(City $city, Country $country): float
+    /**
+     * @throws InvalidArgumentException
+     */
+    public function getWeather(City $city, Country $country): float|string
     {
-        //TODO: Caching mechanism is implemented but tbh I don't get clue of adding cache here. Weather data is pretty dynamic data and may vary from request to request
-        //TODO: moreover in task we want to keep results of searching in the database but because of caching we will not be able to save data a lot of data to database, only requests after cache expire will be saved
-        //TODO: Here I add example of how can I cache data in Symfony but I decide to not use cache
-//        $cacheKey = $this->getCacheKey($city, $country);
-//
-//        return $this->cache->get($cacheKey, function () use ($city) {
-//            $ambeeClientData = $this->ambeeClient->getWeather($city->getLatitude(), $city->getLongitude());
-//            $openWeatherClientData = $this->openWeatherMapClient->getWeather($city->getLatitude(), $city->getLongitude());
-//
-//            return ($ambeeClientData + $openWeatherClientData) / 2;
-//        });
+        $cacheKey = $this->getCacheKey($city, $country);
+        $cacheTtl = $this->parameterBag->get('weather_app_cache_ttl');
 
-        $ambeeClientData = $this->ambeeClient->getWeather($city->getLatitude(), $city->getLongitude());
-        $openWeatherClientData = $this->openWeatherMapClient->getWeather($city->getLatitude(), $city->getLongitude());
-        $currentAverageTemperature = ($ambeeClientData + $openWeatherClientData) / 2;
-        $this->saveWeatherHistory($city, $currentAverageTemperature);
+        try {
+            return $this->cache->get($cacheKey, function (ItemInterface $item) use ($city, $cacheTtl) {
+                $item->expiresAfter((int)$cacheTtl);
+                $currentAverageTemperature = $this->getAverageTemperature(
+                    $city->getLatitude(),
+                    $city->getLongitude(),
+                    $this->ambeeClient,
+                    $this->openWeatherMapClient
+                );
+                $this->saveWeatherHistory($city, $currentAverageTemperature);
 
-        return $currentAverageTemperature;
+                return $currentAverageTemperature;
+            });
+        } catch (\InvalidArgumentException $e) {
+            return $e->getMessage();
+        }
     }
 
-    private function saveWeatherHistory(City $city, float $temperature)
+    /**
+     * @throws \Exception
+     */
+    private function saveWeatherHistory(City $city, float $temperature): void
     {
         $weatherHistory = new WeatherSearchHistory();
         $weatherHistory
@@ -59,5 +69,16 @@ class WeatherService
     private function getCacheKey(City $city, Country $country): string
     {
         return sprintf('weather_%s_%s', $city->getName(), $country->getName());
+    }
+
+    /**
+     * @throws AbstractWeatherException
+     */
+    private function getAverageTemperature(float $latitude, float $longitude, ...$clients): float
+    {
+        $numClients = count($clients);
+        $sumTemperatures = array_reduce($clients, fn ($carry, $client) => $carry + $client->getWeather($latitude, $longitude), 0);
+
+        return $sumTemperatures / $numClients;
     }
 }

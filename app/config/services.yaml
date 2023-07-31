@@ -6,6 +6,7 @@
 parameters:
     open_weather_api_key: '%env(OPEN_WEATHER_API_KEY)%'
     ambee_api_key: '%env(AMBEE_API_KEY)%'
+    weather_app_cache_ttl: '%env(WEATHER_CACHE_TTL)%'
 services:
     # default configuration for services in *this* file
     _defaults:

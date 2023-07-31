@@ -41,5 +41,7 @@ RUN a2ensite default-vhost.conf
 RUN a2enmod rewrite
 
 EXPOSE 80
+EXPOSE 9000
+EXPOSE 9003
 
 WORKDIR /var/www/html
